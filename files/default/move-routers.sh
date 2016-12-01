@@ -1,0 +1,124 @@
+#!/bin/bash
+set -eu
+
+
+function main() {
+    local src
+    local dst
+    local src_agent
+    local dst_agent
+
+    src="${1:-$(fail_with "Please specify a source host: $(list_l3_hosts)")}"
+    dst="${2:-$(fail_with "Please specify a valid destination host: $(list_l3_hosts)")}"
+
+    src_agent=$(l3_agent_of_host $src)
+    dst_agent=$(l3_agent_of_host $dst)
+
+    [ -z "$src_agent" ] && fail_with "Invalid source host ($src), valid ones are: $(list_l3_hosts)"
+    [ -z "$dst_agent" ] && fail_with "Invalid destination host ($dst), valid ones are: $(list_l3_hosts)"
+
+    [ "$src_agent" = "$dst_agent" ] && fail_with "The source and destination must be different"
+
+    for router in $(list_routers_on_agent $src_agent); do
+        move_router $router $src_agent $dst_agent
+    done
+}
+
+
+function fail_with() {
+    local msg
+
+    msg="$1"
+
+    echo "$msg" >&2
+    exit 1
+}
+
+
+function newline_to_space() {
+    tr '\n' ' '
+}
+
+
+function list_l3_hosts() {
+    neutron agent-list --binary neutron-l3-agent -c host -f value | newline_to_space
+}
+
+
+function l3_agent_of_host() {
+    local host
+
+    host="$1"
+
+    neutron agent-list --binary neutron-l3-agent --host $host -c id -f value
+}
+
+
+function list_routers_on_agent() {
+    local agent_id
+
+    agent_id="$1"
+
+    neutron router-list-on-l3-agent "$agent_id" -c id -f value
+}
+
+
+function list_router_ports() {
+    local router
+
+    router="$1"
+
+    neutron router-port-list $router -c id -f value | newline_to_space
+}
+
+
+function has_port() {
+    local host
+    local port
+
+    host="$1"
+    port="$2"
+
+    local actual_host_and_status
+    local actual_status
+    local actual_host
+
+    actual_host_and_status=$(neutron port-show $port -c status -c binding:host_id -f value | newline_to_space)
+    actual_host=$(echo "$actual_host_and_status" | cut -d ' ' -f 1)
+    actual_status=$(echo "$actual_host_and_status" | cut -d ' ' -f 2)
+    [ "$actual_host" = "$host" ] && [ "$actual_status" = "ACTIVE" ]
+}
+
+
+function move_router() {
+    local router
+    local src_agent
+            local dst_agent
+
+    router="$1"
+    src_agent="$2"
+    dst_agent="$3"
+
+    local dst_host
+
+    dst_host=$(neutron agent-show $dst_agent -c host -f value)
+    [ -n "$dst_host" ]
+
+
+    ports=$(list_router_ports $router)
+    neutron l3-agent-router-remove $src_agent $router
+    neutron l3-agent-router-add $dst_agent $router
+
+    echo -n "Waiting for ports to be moved"
+
+    for port in $ports; do
+        while ! has_port $dst_host $port; do
+            echo -n .
+            usleep 100
+        done
+    done
+    echo "done"
+}
+
+
+main "$@"
