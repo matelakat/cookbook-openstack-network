@@ -1,15 +1,31 @@
 #!/bin/bash
+# This script moves routers from one host to another
+#
+# Usage:
+#
+#    move-routers.sh <source host> <destination host> <file with router ids>
+#
+# where <file with router ids> is a file containing router ids, one per line.
+#
+# The script will iterate through all the routers hosted by <source host> and
+# move the ones listed in the file <file with router ids>.
+
 set -eu
 
 
 function main() {
     local src
     local dst
+    local file_with_router_ids
+
     local src_agent
     local dst_agent
 
     src="${1:-$(fail_with "Please specify a source host: $(list_l3_hosts)")}"
     dst="${2:-$(fail_with "Please specify a valid destination host: $(list_l3_hosts)")}"
+    file_with_router_ids="${3:-$(fail_with "Please specify a file with the list of router ids")}"
+
+    [ -e "$file_with_router_ids" ] || fail_with "The file $file_with_router_ids does not exist"
 
     src_agent=$(l3_agent_of_host $src)
     dst_agent=$(l3_agent_of_host $dst)
@@ -20,7 +36,12 @@ function main() {
     [ "$src_agent" = "$dst_agent" ] && fail_with "The source and destination must be different"
 
     for router in $(list_routers_on_agent $src_agent); do
-        move_router $router $src_agent $dst_agent
+        if echo "$router" | grep -qf "$file_with_router_ids"; then
+            log "moving $router from $src_agent to $dst_agent"
+            move_router $router $src_agent $dst_agent
+        else
+            log "router $router was not specified for migration"
+        fi
     done
 }
 
@@ -32,6 +53,15 @@ function fail_with() {
 
     echo "$msg" >&2
     exit 1
+}
+
+
+function log() {
+    local msg
+
+    msg="$1"
+
+    echo "LOG: $msg" >&2
 }
 
 
