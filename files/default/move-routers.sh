@@ -113,9 +113,9 @@ function has_port() {
     local actual_status
     local actual_host
 
-    actual_host_and_status=$(neutron port-show $port -c status -c binding:host_id -f value | newline_to_space)
-    actual_host=$(echo "$actual_host_and_status" | cut -d ' ' -f 1)
-    actual_status=$(echo "$actual_host_and_status" | cut -d ' ' -f 2)
+    eval $(neutron port-show $port -c status -c binding:host_id -f shell | tr : _)
+    actual_host="$binding_host_id"
+    actual_status="$status"
     [ "$actual_host" = "$host" ] && [ "$actual_status" = "ACTIVE" ]
 }
 
