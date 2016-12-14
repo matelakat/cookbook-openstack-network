@@ -248,6 +248,14 @@ def run(args):
     return 1 if errors > 0 else 0
 
 
+class RandomAgentPicker(object):
+    def __init__(self, agents):
+        self.agents = agents
+
+    def pick(self):
+        return random.choice(self.agents)
+
+
 def l3_agent_rebalance(qclient, noop=False, wait_for_router=True):
     """
     Rebalance l3 agent router count across agents.  The number of routers
@@ -536,8 +544,9 @@ def migrate_l3_routers_from_agent(qclient, agent, targets,
 
     migrations = 0
     errors = 0
+    agent_picker = RandomAgentPicker(targets)
     for router_id in router_id_list:
-        target = random.choice(targets)
+        target = agent_picker.pick()
         if migrate_router_safely(qclient, noop, router_id,
                                  agent, target, wait_for_router):
             migrations += 1
