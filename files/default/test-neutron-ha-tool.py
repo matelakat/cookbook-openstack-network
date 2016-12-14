@@ -1,3 +1,4 @@
+import datetime
 import unittest
 import collections
 ha_tool = __import__("neutron-ha-tool")
@@ -162,6 +163,95 @@ class TestL3AgentEvacuate(unittest.TestCase):
         self.assertEqual(0, result)
         self.assertEqual(
             set(['router-1']), neutron_client.routers_by_agent['agent-1'])
+
+
+class TestLeastBusyAgentPicker(unittest.TestCase):
+
+    def setUp(self):
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
+        neutron_client = MockNeutronClient()
+        neutron_client.tst_add_agent(
+            'agent-1', {
+                'agent_type': 'L3 agent',
+                'alive': True,
+                'admin_state_up': True,
+                'host': 'host1',
+                'configurations': {
+                    'agent_mode': 'Mode X'
+                }
+            }
+        )
+        neutron_client.tst_add_agent(
+            'agent-2', {
+                'agent_type': 'L3 agent',
+                'alive': True,
+                'admin_state_up': True,
+                'host': 'host2',
+                'configurations': {
+                    'agent_mode': 'Mode X'
+                }
+            }
+        )
+        neutron_client.tst_add_router('agent-1', 'router-1', {})
+        self.neutron_client = neutron_client
+
+    def make_picker(self):
+        return ha_tool.LeastBusyAgentPicker(
+            self.neutron_client,
+            [
+                {'id': 'agent-1'},
+                {'id': 'agent-2'}
+            ]
+        )
+
+    def test_initial_numbers_queried(self):
+        picker = self.make_picker()
+        self.assertEqual(
+            {
+                'agent-1': 1,
+                'agent-2': 0
+            },
+            picker.router_count_per_agent_id
+        )
+
+    def test_least_busy_picked(self):
+        picker = self.make_picker()
+
+        self.assertEqual('agent-2', picker.pick()['id'])
+
+    def test_router_counts_maintained(self):
+        picker = self.make_picker()
+
+        picker.pick()
+
+        self.assertEqual(
+            {
+                'agent-1': 1,
+                'agent-2': 1
+            },
+            picker.router_count_per_agent_id
+        )
+
+    def test_routers_picked_evenly(self):
+        picker = self.make_picker()
+
+        self.assertEqual('agent-2', picker.pick()['id'])
+        self.assertEqual('agent-1', picker.pick()['id'])
+        self.assertEqual('agent-2', picker.pick()['id'])
+
+    def test_cache_reloaded(self):
+        picker = self.make_picker()
+
+        self.neutron_client.tst_add_router('agent-2', 'router-2', {})
+        self.neutron_client.tst_add_router('agent-2', 'router-3', {})
+
+        picker.cache_created_at = (
+            picker.cache_created_at - datetime.timedelta(
+                seconds=ha_tool.ROUTER_CACHE_MAX_AGE_SECONDS)
+        )
+
+        self.assertEqual('agent-1', picker.pick()['id'])
 
 
 if __name__ == "__main__":
