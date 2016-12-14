@@ -81,9 +81,6 @@ def parse_args():
                     help='Replicate DHCP configuration to all agents')
     ap.add_argument('--now', action='store_true', default=False,
                     help='Migrate Routers immediately without a delay.')
-    ap.add_argument('--wait-for-ports', action='store_true', default=True,
-                    help='When migrating routers, wait for its ports to '
-                         'to be ACTIVE again on the target agent.')
     ap.add_argument('-r', '--retry', action='store_true', default=False,
                     help='Retry neutronclient exceptions with exponential '
                          'backoff')
@@ -97,6 +94,14 @@ def parse_args():
                          'certificate will not be verified against any '
                          'certificate authorities. This option should be used '
                          'with caution.')
+    wait_parser = ap.add_mutually_exclusive_group(required=False)
+    wait_parser.add_argument('--wait-for-ports', action='store_true',
+                    dest='wait_for_ports')
+    wait_parser.add_argument('--no-wait-for-ports', action='store_false',
+                    dest='wait_for_ports',
+                    help='When migrating routers, do not wait for its ports '
+                         'to be ACTIVE again on the target agent.')
+    wait_parser.set_defaults(wait_for_ports=True)
     args = ap.parse_args()
     modes = [
         args.l3_agent_check,
