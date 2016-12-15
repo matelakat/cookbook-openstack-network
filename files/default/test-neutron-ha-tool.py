@@ -248,10 +248,16 @@ class TestLeastBusyAgentPicker(unittest.TestCase):
 
         picker.cache_created_at = (
             picker.cache_created_at - datetime.timedelta(
-                seconds=ha_tool.ROUTER_CACHE_MAX_AGE_SECONDS)
+                seconds=ha_tool.ROUTER_CACHE_MAX_AGE_SECONDS + 1)
         )
 
         self.assertEqual('agent-1', picker.pick()['id'])
+
+    def test_pick_on_empty_array_throws_index_error_as_random_does(self):
+        picker = ha_tool.LeastBusyAgentPicker(self.neutron_client, [])
+
+        with self.assertRaises(IndexError):
+            picker.pick()
 
 
 if __name__ == "__main__":

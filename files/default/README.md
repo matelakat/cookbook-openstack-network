@@ -1,8 +1,7 @@
 # Unit Testing
 
-Make a python virtual environment, install the requirements with:
+Make a python 2 virtual environment, activate it, and install the requirements:
 
-    mkvirtualenv hatool -p python2
     pip install -r test-requirements.txt
 
 Run the tests
