@@ -1,7 +1,8 @@
 import datetime
 import unittest
 import collections
-ha_tool = __import__("neutron-ha-tool")
+import importlib
+ha_tool = importlib.import_module("neutron-ha-tool")
 
 
 class MockNeutronClient(object):
