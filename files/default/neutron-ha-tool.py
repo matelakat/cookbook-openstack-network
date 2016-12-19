@@ -244,15 +244,7 @@ def run(args):
     # set json return type
     qclient.format = 'json'
 
-    if args.agent_selection_mode == 'random':
-        Configuration.agent_picker = RandomAgentPicker()
-    elif args.agent_selection_mode == 'least-busy':
-        Configuration.agent_picker = LeastBusyAgentPicker(qclient)
-    else:
-        raise ValueError('Invalid agent_selection_mode')
-
-    if args.target_agent is not None:
-        Configuration.agent_picker = SingleAgentPicker(args.target_agent)
+    configure(args, qclient)
 
     if args.l3_agent_check:
         LOG.info("Performing L3 Agent Health Check")
@@ -1011,6 +1003,18 @@ class Configuration(object):
     """
 
     agent_picker = RandomAgentPicker()
+
+
+def configure(args, qclient):
+    if args.agent_selection_mode == 'random':
+        Configuration.agent_picker = RandomAgentPicker()
+    elif args.agent_selection_mode == 'least-busy':
+        Configuration.agent_picker = LeastBusyAgentPicker(qclient)
+    else:
+        raise ValueError('Invalid agent_selection_mode')
+
+    if args.target_agent is not None:
+        Configuration.agent_picker = SingleAgentPicker(args.target_agent)
 
 
 if __name__ == '__main__':

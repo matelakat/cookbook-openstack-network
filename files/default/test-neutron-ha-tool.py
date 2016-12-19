@@ -291,6 +291,51 @@ class TestSingleAgentPicker(unittest.TestCase):
         self.assertRaises(ValueError, picker.pick)
 
 
+def configure_with(cmdline="", qclient='irrelevant'):
+    parser = ha_tool.make_argparser()
+    args = parser.parse_args(cmdline.split())
+
+    ha_tool.configure(args, qclient)
+
+
+class TestMakeConfiguration(unittest.TestCase):
+    def test_default_strategy_is_least_busy_agent_picker(self):
+        configure_with('')
+
+        self.assertIsInstance(
+            ha_tool.Configuration.agent_picker,
+            ha_tool.LeastBusyAgentPicker
+        )
+
+    def test_neutron_client_injected_to_least_busy_agent_picker(self):
+        configure_with('', 'qclient')
+
+        self.assertEqual(
+            'qclient',
+            ha_tool.Configuration.agent_picker.qclient
+        )
+
+    def test_selecting_random_agent_picker(self):
+        configure_with('--agent-selection-mode random')
+
+        self.assertIsInstance(
+            ha_tool.Configuration.agent_picker,
+            ha_tool.RandomAgentPicker
+        )
+
+    def test_explicit_agent_specified(self):
+        configure_with('--target-agent xyz')
+
+        self.assertIsInstance(
+            ha_tool.Configuration.agent_picker,
+            ha_tool.SingleAgentPicker
+        )
+        self.assertEqual(
+            'xyz',
+            ha_tool.Configuration.agent_picker.agent_selection_value
+        )
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     unittest.main()
