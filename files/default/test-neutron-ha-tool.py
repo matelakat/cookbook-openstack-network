@@ -3,6 +3,7 @@ import unittest
 import collections
 import importlib
 import logging
+import tempfile
 ha_tool = importlib.import_module("neutron-ha-tool")
 
 
@@ -343,6 +344,61 @@ class TestRouterFilterConfiguration(unittest.TestCase):
         self.assertIsInstance(
             ha_tool.Configuration.router_filter,
             ha_tool.NullRouterFilter
+        )
+
+    def test_set_router_list(self):
+        configure_with('--router-list-file routers.lst')
+
+        self.assertIsInstance(
+            ha_tool.Configuration.router_filter,
+            ha_tool.ListFileBasedRouterFilter
+        )
+        self.assertEqual(
+            'routers.lst',
+            ha_tool.Configuration.router_filter.router_list_file
+        )
+
+
+class TestListFileBasedRouterFilter(unittest.TestCase):
+    def test_if_file_does_not_exist_system_error_raised(self):
+        router_filter = ha_tool.ListFileBasedRouterFilter('nonexisting')
+
+        with self.assertRaises(IOError):
+            router_filter.load()
+
+    def test_loading_router_list_file(self):
+        with tempfile.NamedTemporaryFile() as list_file:
+            list_file.write('id-1\n')
+            list_file.write('\n')
+            list_file.write('     \n')
+            list_file.write('\t\t\n')
+            list_file.write('id-2')
+            list_file.seek(0)
+
+            router_filter = ha_tool.ListFileBasedRouterFilter(list_file.name)
+            router_filter.load()
+
+        self.assertEqual(
+            ['id-1', 'id-2'],
+            router_filter.router_list
+        )
+
+    def test_filtering_some_routers(self):
+        router_filter = ha_tool.ListFileBasedRouterFilter(None)
+        router_filter.router_list = ['a']
+
+        self.assertEqual(
+            ['a'],
+            router_filter.filter_routers(['a', 'b'])
+        )
+
+    def test_non_listed_routers_are_not_returned(self):
+        router_filter = ha_tool.ListFileBasedRouterFilter(None)
+        router_filter.router_list = ['a']
+
+        self.assertEqual(
+            [],
+            router_filter.filter_routers(['c', 'd'])
         )
 
 

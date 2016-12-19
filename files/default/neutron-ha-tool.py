@@ -106,6 +106,10 @@ def make_argparser():
     ap.add_argument('--target-agent', default=None,
                     help='Explicitly select a target agent either by specifying '
                          'an agent id or a host id.')
+    ap.add_argument('--router-list-file', default=None,
+                    help='Only routers specified in the list file will be '
+                         'moved. The router list file should specify one '
+                         'router id per line.')
     wait_parser = ap.add_mutually_exclusive_group(required=False)
     wait_parser.add_argument('--wait-for-router', action='store_true',
                              dest='wait_for_router')
@@ -245,6 +249,7 @@ def run(args):
     qclient.format = 'json'
 
     configure(args, qclient)
+    Configuration.router_filter.load()
 
     if args.l3_agent_check:
         LOG.info("Performing L3 Agent Health Check")
@@ -999,8 +1004,32 @@ class SingleAgentPicker(object):
 
 
 class NullRouterFilter(object):
+    def load(self):
+        pass
+
     def filter_routers(self, router_id_list):
         return router_id_list
+
+
+class ListFileBasedRouterFilter(object):
+    def __init__(self, router_list_file):
+        self.router_list_file = router_list_file
+        self.router_list = []
+
+    def load(self):
+        self.router_list = []
+        with open(self.router_list_file, 'r') as fh_router_list:
+            for line in fh_router_list.read().split():
+                router_id = line.strip()
+                if router_id:
+                    self.router_list.append(router_id)
+
+    def filter_routers(self, router_id_list):
+        return [
+            router_id
+            for router_id in router_id_list
+            if router_id in self.router_list
+        ]
 
 
 class Configuration(object):
@@ -1022,6 +1051,11 @@ def configure(args, qclient):
 
     if args.target_agent is not None:
         Configuration.agent_picker = SingleAgentPicker(args.target_agent)
+
+    if args.router_list_file:
+        Configuration.router_filter = ListFileBasedRouterFilter(
+            args.router_list_file
+        )
 
 
 if __name__ == '__main__':
