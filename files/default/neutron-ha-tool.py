@@ -112,6 +112,9 @@ def parse_args():
                     help='Determines how target agent is selected for routers '
                          '"random" selects target agent randomly, '
                          '"least-busy" selects the least busy agent.')
+    ap.add_argument('--target-agent', default=None,
+                    help='Explicitly select a target agent either by specifying '
+                         'an agent id or a host id.')
     wait_parser = ap.add_mutually_exclusive_group(required=False)
     wait_parser.add_argument('--wait-for-router', action='store_true',
                              dest='wait_for_router')
@@ -242,6 +245,10 @@ def run(args):
         Configuration.agent_picker_class = LeastBusyAgentPicker
     else:
         raise ValueError('Invalid agent_selection_mode')
+
+    if args.target_agent is not None:
+        Configuration.agent_picker_class = SingleAgentPicker
+        SingleAgentPicker.agent_selection_value = args.target_agent
 
     if args.l3_agent_check:
         LOG.info("Performing L3 Agent Health Check")
