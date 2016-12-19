@@ -411,7 +411,8 @@ def l3_agent_migrate(qclient, noop=False, now=False,
     """
     Walk the l3 agents searching for agents that are offline.  For those that
     are offline, we will retrieve a list of routers on them and migrate them to
-    a random l3 agent that is online.
+    an l3 agent that is online using the strategy specified by
+    Configuration.agent_picker_class.
 
     :param qclient: A neutronclient
     :param noop: Optional noop flag
