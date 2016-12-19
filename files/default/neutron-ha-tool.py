@@ -942,7 +942,6 @@ class RandomAgentPicker(object):
 
 class LeastBusyAgentPicker(object):
     def __init__(self, qclient):
-        self.now = datetime.datetime.now
         self.cache_created_at = None
         self.qclient = qclient
         self.agents_by_id = {}
@@ -959,10 +958,10 @@ class LeastBusyAgentPicker(object):
             self.router_count_per_agent_id[agent_id] = len(
                 list_routers_on_l3_agent(self.qclient, agent_id)
             )
-        self.cache_created_at = self.now()
+        self.cache_created_at = datetime.datetime.now()
 
     def cache_expired(self):
-        cache_life = self.now() - self.cache_created_at
+        cache_life = datetime.datetime.now() - self.cache_created_at
         return cache_life.total_seconds() > ROUTER_CACHE_MAX_AGE_SECONDS
 
     def pick(self):
