@@ -240,15 +240,14 @@ def run(args):
     qclient.format = 'json'
 
     if args.agent_selection_mode == 'random':
-        Configuration.agent_picker_class = RandomAgentPicker
+        Configuration.agent_picker = RandomAgentPicker()
     elif args.agent_selection_mode == 'least-busy':
-        Configuration.agent_picker_class = LeastBusyAgentPicker
+        Configuration.agent_picker = LeastBusyAgentPicker(qclient)
     else:
         raise ValueError('Invalid agent_selection_mode')
 
     if args.target_agent is not None:
-        Configuration.agent_picker_class = SingleAgentPicker
-        SingleAgentPicker.agent_selection_value = args.target_agent
+        Configuration.agent_picker = SingleAgentPicker(args.target_agent)
 
     if args.l3_agent_check:
         LOG.info("Performing L3 Agent Health Check")
@@ -419,7 +418,7 @@ def l3_agent_migrate(qclient, noop=False, now=False,
     Walk the l3 agents searching for agents that are offline.  For those that
     are offline, we will retrieve a list of routers on them and migrate them to
     an l3 agent that is online using the strategy specified by
-    Configuration.agent_picker_class.
+    Configuration.agent_picker.
 
     :param qclient: A neutronclient
     :param noop: Optional noop flag
@@ -575,7 +574,9 @@ def migrate_l3_routers_from_agent(qclient, agent, targets,
 
     migrations = 0
     errors = 0
-    agent_picker = Configuration.agent_picker_class(qclient, targets)
+    agent_picker = Configuration.agent_picker
+    agent_picker.set_agents(targets)
+
     for router_id in router_id_list:
         target = agent_picker.pick()
         if migrate_router_safely(qclient, noop, router_id, agent,
@@ -929,7 +930,10 @@ def list_dead_agents(agent_list, agent_type):
 
 
 class RandomAgentPicker(object):
-    def __init__(self, qclient, agents):
+    def __init__(self):
+        self.agents = []
+
+    def set_agents(self, agents):
         self.agents = agents
 
     def pick(self):
@@ -937,12 +941,15 @@ class RandomAgentPicker(object):
 
 
 class LeastBusyAgentPicker(object):
-    def __init__(self, qclient, agents):
+    def __init__(self, qclient):
         self.now = datetime.datetime.now
         self.cache_created_at = None
         self.qclient = qclient
-        self.agents_by_id = {agent['id']: agent for agent in agents}
+        self.agents_by_id = {}
         self.router_count_per_agent_id = {}
+
+    def set_agents(self, agents):
+        self.agents_by_id = {agent['id']: agent for agent in agents}
         self.refresh_router_count_per_agent_id()
 
     def refresh_router_count_per_agent_id(self):
@@ -973,9 +980,11 @@ class LeastBusyAgentPicker(object):
 
 class SingleAgentPicker(object):
     agent_keys = ('id', 'host')
-    agent_selection_value = None
 
-    def __init__(self, qclient, agents):
+    def __init__(self, agent_selection_value):
+        self.agent_selection_value = agent_selection_value
+
+    def set_agents(self, agents):
         self.agents = agents
 
     def find_agent(self, value):
@@ -997,7 +1006,7 @@ class Configuration(object):
     Registry for storing application's configuration
     """
 
-    agent_picker_class = LeastBusyAgentPicker
+    agent_picker = RandomAgentPicker()
 
 
 if __name__ == '__main__':

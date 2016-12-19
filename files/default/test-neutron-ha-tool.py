@@ -152,13 +152,14 @@ class TestLeastBusyAgentPicker(unittest.TestCase):
         self.neutron_client = neutron_client
 
     def make_picker(self):
-        return ha_tool.LeastBusyAgentPicker(
-            self.neutron_client,
+        picker = ha_tool.LeastBusyAgentPicker(self.neutron_client)
+        picker.set_agents(
             [
                 {'id': 'live-agent-0'},
                 {'id': 'live-agent-1'}
             ]
         )
+        return picker
 
     def test_initial_numbers_queried(self):
         self.neutron_client.tst_add_router('live-agent-0', 'router', {})
@@ -232,7 +233,8 @@ class TestLeastBusyAgentPicker(unittest.TestCase):
         self.assertEqual('live-agent-1', picker.pick()['id'])
 
     def test_pick_on_empty_array_throws_index_error_as_random_does(self):
-        picker = ha_tool.LeastBusyAgentPicker(self.neutron_client, [])
+        picker = ha_tool.LeastBusyAgentPicker(self.neutron_client)
+        picker.set_agents([])
 
         with self.assertRaises(IndexError):
             picker.pick()
@@ -245,8 +247,8 @@ class TestSingleAgentPicker(unittest.TestCase):
         self.neutron_client = neutron_client
 
     def make_picker(self):
-        picker = ha_tool.SingleAgentPicker(
-            self.neutron_client,
+        picker = ha_tool.SingleAgentPicker(None)
+        picker.set_agents(
             [
                 {'id': 'live-agent-0', 'host': 'host-0'},
                 {'id': 'live-agent-1', 'host': 'host-1'}
@@ -283,10 +285,8 @@ class TestSingleAgentPicker(unittest.TestCase):
         self.assertEqual('Cannot find desired agent', str(ctx.exception))
 
     def test_agent_selection_value_not_specified_raises_value_error(self):
-        picker = ha_tool.SingleAgentPicker(
-            self.neutron_client,
-            []
-        )
+        picker = ha_tool.SingleAgentPicker(None)
+        picker.set_agents([])
 
         self.assertRaises(ValueError, picker.pick)
 
