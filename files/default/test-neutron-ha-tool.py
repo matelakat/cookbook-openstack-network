@@ -238,6 +238,59 @@ class TestLeastBusyAgentPicker(unittest.TestCase):
             picker.pick()
 
 
+class TestSingleAgentPicker(unittest.TestCase):
+
+    def setUp(self):
+        neutron_client = make_neturon_client(live_agents=2)
+        self.neutron_client = neutron_client
+
+    def make_picker(self):
+        picker = ha_tool.SingleAgentPicker(
+            self.neutron_client,
+            [
+                {'id': 'live-agent-0', 'host': 'host-0'},
+                {'id': 'live-agent-1', 'host': 'host-1'}
+            ]
+        )
+        return picker
+
+    def test_picking_an_agent_by_agent_id(self):
+        picker = self.make_picker()
+
+        picker.agent_selection_value = 'live-agent-0'
+
+        picked_agent = picker.pick()
+
+        self.assertEqual('live-agent-0', picked_agent['id'])
+
+    def test_picking_an_agent_by_host(self):
+        picker = self.make_picker()
+
+        picker.agent_selection_value = 'host-0'
+
+        picked_agent = picker.pick()
+
+        self.assertEqual('host-0', picked_agent['host'])
+
+    def test_agent_not_found_raises_index_error(self):
+        picker = self.make_picker()
+
+        picker.agent_selection_value = 'notfound'
+
+        with self.assertRaises(IndexError) as ctx:
+            picker.pick()
+
+        self.assertEqual('Cannot find desired agent', str(ctx.exception))
+
+    def test_agent_selection_value_not_specified_raises_value_error(self):
+        picker = ha_tool.SingleAgentPicker(
+            self.neutron_client,
+            []
+        )
+
+        self.assertRaises(ValueError, picker.pick)
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     unittest.main()

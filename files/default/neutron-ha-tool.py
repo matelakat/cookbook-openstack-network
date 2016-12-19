@@ -964,6 +964,27 @@ class LeastBusyAgentPicker(object):
         return self.agents_by_id[agent_id]
 
 
+class SingleAgentPicker(object):
+    agent_keys = ('id', 'host')
+    agent_selection_value = None
+
+    def __init__(self, qclient, agents):
+        self.agents = agents
+
+    def find_agent(self, value):
+        for agent in self.agents:
+            agent_values = [agent.get(key) for key in self.agent_keys]
+            if value in agent_values:
+                return agent
+        raise IndexError('Cannot find desired agent')
+
+    def pick(self):
+        if not self.agent_selection_value:
+            raise ValueError('agent_selection_value is None')
+
+        return self.find_agent(self.agent_selection_value)
+
+
 class Configuration(object):
     """
     Registry for storing application's configuration
