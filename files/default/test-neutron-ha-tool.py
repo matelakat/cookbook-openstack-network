@@ -336,6 +336,16 @@ class TestMakeConfiguration(unittest.TestCase):
         )
 
 
+class TestRouterFilterConfiguration(unittest.TestCase):
+    def test_null_router_filter_is_the_default(self):
+        configure_with('')
+
+        self.assertIsInstance(
+            ha_tool.Configuration.router_filter,
+            ha_tool.NullRouterFilter
+        )
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     unittest.main()

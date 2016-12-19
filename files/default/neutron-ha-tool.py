@@ -568,6 +568,7 @@ def migrate_l3_routers_from_agent(qclient, agent, targets,
                                   noop, wait_for_router, delete_namespace):
     LOG.info("Querying agent_id=%s for routers to migrate away", agent['id'])
     router_id_list = list_routers_on_l3_agent(qclient, agent['id'])
+    router_id_list = Configuration.router_filter.filter_routers(router_id_list)
 
     migrations = 0
     errors = 0
@@ -997,12 +998,18 @@ class SingleAgentPicker(object):
         return self.find_agent(self.agent_selection_value)
 
 
+class NullRouterFilter(object):
+    def filter_routers(self, router_id_list):
+        return router_id_list
+
+
 class Configuration(object):
     """
     Registry for storing application's configuration
     """
 
     agent_picker = RandomAgentPicker()
+    router_filter = NullRouterFilter()
 
 
 def configure(args, qclient):
