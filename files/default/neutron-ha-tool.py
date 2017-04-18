@@ -1153,22 +1153,22 @@ class RemoteNodeCleanup(object):
     def delete_remote_namespace(self, namespace):
         LOG.debug("Deleting namespace %s on host %s.", namespace,
                   self.target_host)
-        self._ssh_connect()
-        with self.ssh_client:
-            try:
-                if self._namespace_exists(namespace):
-                    self._kill_pids_in_namespace(namespace)
-                    self._simple_ssh_command(self.netns_del + namespace)
-            except socket.timeout:
-                LOG.warn("SSH timeout exceeded. Failed to delete namespace "
-                         "%s on %s", namespace, self.target_host)
+        try:
+            if self._namespace_exists(namespace):
+                self._kill_pids_in_namespace(namespace)
+                self._simple_ssh_command(self.netns_del + namespace)
+        except socket.timeout:
+            LOG.warn("SSH timeout exceeded. Failed to delete namespace "
+                     "%s on %s", namespace, self.target_host)
 
 
 class RemoteRouterNsCleanup(RemoteNodeCleanup):
 
     def delete_router_namespace(self, router_id):
-        namespace = "qrouter-" + router_id
-        self.delete_remote_namespace(namespace)
+        self._ssh_connect()
+        with self.ssh_client:
+            namespace = "qrouter-" + router_id
+            self.delete_remote_namespace(namespace)
 
 
 def term_signal_handler(signum, frame):
