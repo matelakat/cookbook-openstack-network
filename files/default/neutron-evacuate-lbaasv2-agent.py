@@ -182,26 +182,26 @@ class EvacuateLbaasV2Agent(object):
 class RemoteLbaasV2Cleanup(hatool.RemoteNodeCleanup):
 
     def restart_lbaasv2_agent_crm(self):
-        with self.connected_to_host():
+        with self.connected_to_host() as host:
             try:
-                self._simple_ssh_command("crm --wait node maintenance")
-                self._simple_ssh_command(
+                host.run("crm --wait node maintenance")
+                host.run(
                     "systemctl restart openstack-neutron-lbaasv2-agent")
-                self._simple_ssh_command("crm --wait node ready")
+                host.run("crm --wait node ready")
             except socket.timeout:
                 LOG.warn("SSH timeout exceeded. Failed to restart "
                          "openstack-neutron-lbaasv2-agent on %s",
-                         self.target_host)
+                         host)
 
     def restart_lbaasv2_agent_systemd(self):
-        with self.connected_to_host():
+        with self.connected_to_host() as host:
             try:
-                self._simple_ssh_command(
+                host.run(
                     "systemctl restart openstack-neutron-lbaasv2-agent")
             except socket.timeout:
                 LOG.warn("SSH timeout exceeded. Failed to restart "
                          "openstack-neutron-lbaasv2-agent on %s",
-                         self.target_host)
+                         host)
 
     def delete_lbaasv2_namespaces(self, loadbalancer_ids):
         with self.connected_to_host():

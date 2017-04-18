@@ -1085,18 +1085,16 @@ class RemoteNodeCleanup(object):
     @contextlib.contextmanager
     def connected_to_host(self):
         with connect_to_host(self.target_host, self.timeout) as host:
+            host.run_timeout = self.timeout
             self.host = host
-            yield None
-
-    def _simple_ssh_command(self, command):
-        return self.host.run(command, timeout=self.timeout)
+            yield host
 
     def _namespace_exists(self, namespace):
-        rc, out_lines = self._simple_ssh_command(self.netns_list)
+        rc, out_lines = self.host.run(self.netns_list)
         return namespace in out_lines
 
     def _get_namespace_pids(self, namespace):
-        rc, out_lines = self._simple_ssh_command(self.netns_pids + namespace)
+        rc, out_lines = self.host.run(self.netns_pids + namespace)
         if rc:
             if out_lines and "No such file or directory" in out_lines[0]:
                 # Assume the namespace was delete meanwhile
@@ -1121,7 +1119,7 @@ class RemoteNodeCleanup(object):
                     LOG.debug("Last try. Using SIGKILL now")
                     killcmd = "kill -9 "
 
-                rc, out_lines = self._simple_ssh_command(killcmd + pid)
+                rc, out_lines = self.host.run(killcmd + pid)
                 if rc:
                     if out_lines and "No such process" in out_lines[0]:
                         # Assume the process was stopped meanwhile
@@ -1147,7 +1145,7 @@ class RemoteNodeCleanup(object):
         try:
             if self._namespace_exists(namespace):
                 self._kill_pids_in_namespace(namespace)
-                self._simple_ssh_command(self.netns_del + namespace)
+                self.host.run(self.netns_del + namespace)
         except socket.timeout:
             LOG.warn("SSH timeout exceeded. Failed to delete namespace "
                      "%s on %s", namespace, self.target_host)
@@ -1165,11 +1163,13 @@ class SSHHost(object):
     def __init__(self, ssh_client, hostname):
         self._ssh_client = ssh_client
         self.hostname = hostname
+        self.run_timeout = None
 
-    def run(self, command, timeout):
+    def run(self, command, timeout=None):
         # Note, that when get_pty is True, paramiko will never return anything
         # on the stderr channel, that's why we ignore it here. (stderr output
         # will endup in the stdout channel)
+        timeout = timeout or self.run_timeout
         _, stdout, _ = self._ssh_client.exec_command(command,
                                                      timeout=timeout,
                                                      get_pty=True)

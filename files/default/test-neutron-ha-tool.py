@@ -702,3 +702,33 @@ class TestSSHHost(unittest.TestCase):
             pass
 
         ssh_client.connect.assert_called_once_with('somehost', timeout=10)
+
+    @mocked_ssh_client
+    def test_setting_run_timeout_on_host(self, ssh_client):
+        stdout = mock.Mock()
+        stdout.readlines.return_value = []
+        stdout.channel.recv_exit_status.return_value = 0
+        ssh_client.exec_command.return_value = (
+            mock.Mock(), stdout, mock.Mock()
+        )
+
+        with ha_tool.connect_to_host('somehost', 10) as host:
+            host.run_timeout = 30
+            host.run('ls -la')
+
+        ssh_client.exec_command.assert_called_once_with(
+            'ls -la', timeout=30, get_pty=True)
+
+    @mocked_ssh_client
+    def test_run_return_values(self, ssh_client):
+        stdout = mock.Mock()
+        stdout.readlines.return_value = ['  line 1  \r\n', '  line2  \r\n']
+        stdout.channel.recv_exit_status.return_value = 4
+        ssh_client.exec_command.return_value = (
+            mock.Mock(), stdout, mock.Mock()
+        )
+
+        with ha_tool.connect_to_host('somehost', 10) as host:
+            result = host.run('ls -la')
+
+        self.assertEqual([4, ['line 1', 'line2']], result)
