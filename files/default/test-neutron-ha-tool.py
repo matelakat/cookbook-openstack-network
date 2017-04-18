@@ -688,3 +688,10 @@ class TestAgentRebalancing(unittest.TestCase):
         self.assertEqual(
             [5], get_router_distribution(neutron_client)
         )
+
+
+class TestSSHHost(unittest.TestCase):
+    @mocked_ssh_client
+    def test_str_prints_hostname(self, ssh_client):
+        with ha_tool.connect_to_host('somehost', 10) as ssh_host:
+            self.assertEqual('somehost', str(ssh_host))

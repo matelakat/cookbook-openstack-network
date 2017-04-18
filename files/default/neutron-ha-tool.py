@@ -1162,8 +1162,9 @@ class RemoteRouterNsCleanup(RemoteNodeCleanup):
 
 
 class SSHHost(object):
-    def __init__(self, ssh_client):
+    def __init__(self, ssh_client, hostname):
         self._ssh_client = ssh_client
+        self.hostname = hostname
 
     def run(self, command, timeout):
         # Note, that when get_pty is True, paramiko will never return anything
@@ -1176,6 +1177,9 @@ class SSHHost(object):
         rc = stdout.channel.recv_exit_status()
         return [rc, [line.strip() for line in out_lines]]
 
+    def __str__(self):
+        return self.hostname
+
 
 @contextlib.contextmanager
 def connect_to_host(hostname, connect_timeout):
@@ -1185,7 +1189,7 @@ def connect_to_host(hostname, connect_timeout):
         )
         ssh_client.load_system_host_keys()
         ssh_client.connect(hostname, timeout=connect_timeout)
-        yield SSHHost(ssh_client)
+        yield SSHHost(ssh_client, hostname)
 
 
 def term_signal_handler(signum, frame):
