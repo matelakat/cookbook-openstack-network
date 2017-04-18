@@ -2,6 +2,7 @@ import argparse
 import datetime
 import unittest
 import collections
+import functools
 import importlib
 import tempfile
 import mock
@@ -329,10 +330,28 @@ class TestWhitelistRouterFilter(unittest.TestCase):
         self.assertEqual(['router-id-1'], filtered_router_ids)
 
 
+def mocked_ssh_client(fun):
+    @functools.wraps(fun)
+    def decorated(*args, **kwargs):
+        with mock.patch('neutron-ha-tool.paramiko.SSHClient') as ssh_client:
+            mock_client = mock.Mock()
+
+            _mock_context = mock.Mock()
+            _mock_context.__enter__ = mock.Mock()
+            _mock_context.__exit__ = mock.Mock()
+            _mock_context.__exit__.return_value = False
+            _mock_context.__enter__.return_value = mock_client
+
+            ssh_client.return_value = _mock_context
+            return fun(*tuple(args + (mock_client, )), **kwargs)
+
+    return decorated
+
+
 class TestSshDeleteRouterNamespace(unittest.TestCase):
 
-    @mock.patch('neutron-ha-tool.paramiko.SSHClient')
-    def test_namespace_deleted(self, mock_ssh):
+    @mocked_ssh_client
+    def test_namespace_deleted(self, mock_client):
         self.ssh_exec_side_effect_counter = 0
 
         def ssh_exec_side_effect(*args, **kwargs):
@@ -359,7 +378,8 @@ class TestSshDeleteRouterNamespace(unittest.TestCase):
 
             return [mock.MagicMock, mock_stdout, mock.MagicMock]
 
-        mock_ssh.return_value.exec_command.side_effect = ssh_exec_side_effect
+        mock_client.exec_command.side_effect = ssh_exec_side_effect
+
         ns_cleanup = ha_tool.RemoteRouterNsCleanup("host1")
         ns_cleanup.delete_router_namespace("routerid1")
         expected_calls = [
@@ -373,12 +393,12 @@ class TestSshDeleteRouterNamespace(unittest.TestCase):
             mock.call("ip netns delete qrouter-routerid1", get_pty=mock.ANY,
                       timeout=mock.ANY)
         ]
-        mock_ssh.return_value.connect.assert_called_once_with(
+        mock_client.connect.assert_called_once_with(
             "host1", timeout=mock.ANY)
-        mock_ssh.return_value.exec_command.assert_has_calls(expected_calls)
+        mock_client.exec_command.assert_has_calls(expected_calls)
 
-    @mock.patch('neutron-ha-tool.paramiko.SSHClient')
-    def test_namespace_does_not_exist(self, mock_ssh):
+    @mocked_ssh_client
+    def test_namespace_does_not_exist(self, mock_client):
         def side_effect_namespace_absent(*args, **kwargs):
             mock_stdout = mock.MagicMock()
             mock_stdout.readlines.return_value = []
@@ -388,18 +408,18 @@ class TestSshDeleteRouterNamespace(unittest.TestCase):
             return [mock.MagicMock(), mock_stdout, mock.MagicMock()]
 
         ns_cleanup = ha_tool.RemoteRouterNsCleanup("host1")
-        mock_ssh.return_value.exec_command.side_effect = \
+        mock_client.exec_command.side_effect = \
             side_effect_namespace_absent
         ns_cleanup.delete_router_namespace("routerid1")
-        mock_ssh.return_value.exec_command.assert_called_once_with(
+        mock_client.exec_command.assert_called_once_with(
             "ip netns list", timeout=mock.ANY, get_pty=mock.ANY)
 
-    @mock.patch('neutron-ha-tool.paramiko.SSHClient')
-    def test_ssh_command_timeout(self, mock_ssh):
+    @mocked_ssh_client
+    def test_ssh_command_timeout(self, mock_client):
         def side_effect_ssh_connect(self, *args, **kwargs):
             raise socket.timeout
 
-        mock_ssh.return_value.exec_command.side_effect = \
+        mock_client.exec_command.side_effect = \
             side_effect_ssh_connect
         ns_cleanup = ha_tool.RemoteRouterNsCleanup("host1")
         ns_cleanup.delete_router_namespace("routerid1")

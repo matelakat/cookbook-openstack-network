@@ -1082,23 +1082,14 @@ class RemoteNodeCleanup(object):
         self.netns_pids = "ip netns pids "
         self.netns_list = "ip netns list"
 
-    def _ssh_connect(self):
-        self.ssh_client = paramiko.SSHClient()
-        self.ssh_client.set_missing_host_key_policy(
-            paramiko.AutoAddPolicy())
-        self.ssh_client.load_system_host_keys()
-        self.ssh_client.connect(self.target_host, timeout=self.timeout)
+    @contextlib.contextmanager
+    def connected_to_host(self):
+        with connect_to_host(self.target_host, self.timeout) as host:
+            self.host = host
+            yield None
 
     def _simple_ssh_command(self, command):
-        # Note, that when get_pty is True, paramiko will never return anything
-        # on the stderr channel, that's why we ignore it here. (stderr output
-        # will endup in the stdout channel)
-        _, stdout, _ = self.ssh_client.exec_command(command,
-                                                    timeout=self.timeout,
-                                                    get_pty=True)
-        out_lines = stdout.readlines()
-        rc = stdout.channel.recv_exit_status()
-        return [rc, [line.strip() for line in out_lines]]
+        return self.host.run(command, timeout=self.timeout)
 
     def _namespace_exists(self, namespace):
         rc, out_lines = self._simple_ssh_command(self.netns_list)
@@ -1165,10 +1156,36 @@ class RemoteNodeCleanup(object):
 class RemoteRouterNsCleanup(RemoteNodeCleanup):
 
     def delete_router_namespace(self, router_id):
-        self._ssh_connect()
-        with self.ssh_client:
+        with self.connected_to_host():
             namespace = "qrouter-" + router_id
             self.delete_remote_namespace(namespace)
+
+
+class SSHHost(object):
+    def __init__(self, ssh_client):
+        self._ssh_client = ssh_client
+
+    def run(self, command, timeout):
+        # Note, that when get_pty is True, paramiko will never return anything
+        # on the stderr channel, that's why we ignore it here. (stderr output
+        # will endup in the stdout channel)
+        _, stdout, _ = self._ssh_client.exec_command(command,
+                                                     timeout=timeout,
+                                                     get_pty=True)
+        out_lines = stdout.readlines()
+        rc = stdout.channel.recv_exit_status()
+        return [rc, [line.strip() for line in out_lines]]
+
+
+@contextlib.contextmanager
+def connect_to_host(hostname, connect_timeout):
+    with paramiko.SSHClient() as ssh_client:
+        ssh_client.set_missing_host_key_policy(
+            paramiko.AutoAddPolicy()
+        )
+        ssh_client.load_system_host_keys()
+        ssh_client.connect(hostname, timeout=connect_timeout)
+        yield SSHHost(ssh_client)
 
 
 def term_signal_handler(signum, frame):

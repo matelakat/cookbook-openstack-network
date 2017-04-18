@@ -182,8 +182,7 @@ class EvacuateLbaasV2Agent(object):
 class RemoteLbaasV2Cleanup(hatool.RemoteNodeCleanup):
 
     def restart_lbaasv2_agent_crm(self):
-        self._ssh_connect()
-        with self.ssh_client:
+        with self.connected_to_host():
             try:
                 self._simple_ssh_command("crm --wait node maintenance")
                 self._simple_ssh_command(
@@ -195,8 +194,7 @@ class RemoteLbaasV2Cleanup(hatool.RemoteNodeCleanup):
                          self.target_host)
 
     def restart_lbaasv2_agent_systemd(self):
-        self._ssh_connect()
-        with self.ssh_client:
+        with self.connected_to_host():
             try:
                 self._simple_ssh_command(
                     "systemctl restart openstack-neutron-lbaasv2-agent")
@@ -206,8 +204,7 @@ class RemoteLbaasV2Cleanup(hatool.RemoteNodeCleanup):
                          self.target_host)
 
     def delete_lbaasv2_namespaces(self, loadbalancer_ids):
-        self._ssh_connect()
-        with self.ssh_client:
+        with self.connected_to_host():
             for lb in loadbalancer_ids:
                 namespace = "qlbaas-" + lb
                 self.delete_remote_namespace(namespace)
