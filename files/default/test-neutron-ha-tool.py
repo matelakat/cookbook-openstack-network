@@ -695,3 +695,10 @@ class TestSSHHost(unittest.TestCase):
     def test_str_prints_hostname(self, ssh_client):
         with ha_tool.connect_to_host('somehost', 10) as ssh_host:
             self.assertEqual('somehost', str(ssh_host))
+
+    @mocked_ssh_client
+    def test_connect_timeout(self, ssh_client):
+        with ha_tool.connect_to_host('somehost', 10):
+            pass
+
+        ssh_client.connect.assert_called_once_with('somehost', timeout=10)
