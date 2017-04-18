@@ -210,16 +210,7 @@ class RemoteLbaasV2Cleanup(hatool.RemoteNodeCleanup):
         with self.ssh_client:
             for lb in loadbalancer_ids:
                 namespace = "qlbaas-" + lb
-                LOG.info("deleting namespace %s on %s",
-                         namespace, self.target_host)
-                try:
-                    if self._namespace_exists(namespace):
-                        self._kill_pids_in_namespace(namespace)
-                        self._simple_ssh_command(self.netns_del + namespace)
-                except socket.timeout:
-                    LOG.warn("SSH timeout exceeded. Failed to delete "
-                             "namespace %s on %s", namespace,
-                             self.target_host)
+                self.delete_remote_namespace(namespace)
 
 
 if __name__ == '__main__':

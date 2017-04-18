@@ -1151,8 +1151,8 @@ class RemoteNodeCleanup(object):
                 break
 
     def delete_remote_namespace(self, namespace):
-        LOG.debug("Deleting namespace %s on host %s.", namespace,
-                  self.target_host)
+        LOG.info("Deleting namespace %s on host %s.", namespace,
+                 self.target_host)
         try:
             if self._namespace_exists(namespace):
                 self._kill_pids_in_namespace(namespace)
