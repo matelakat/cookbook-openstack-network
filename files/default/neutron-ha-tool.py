@@ -1107,7 +1107,7 @@ class RemoteNodeCleanup(object):
 
     def _kill_pids_in_namespace(self, namespace):
         LOG.debug("Trying to terminate all processes namespace "
-                  "%s on host %s", namespace, self.target_host)
+                  "%s on host %s", namespace, self.host)
         remaining = 3
         pids = self._get_namespace_pids(namespace)
         while pids:
@@ -1126,7 +1126,7 @@ class RemoteNodeCleanup(object):
                         return None
                     else:
                         raise RuntimeError("Failed to kill %s on host %s",
-                                           pid, self.target_host)
+                                           pid, self.host)
 
             remaining -= 1
             if remaining:
@@ -1134,21 +1134,21 @@ class RemoteNodeCleanup(object):
                 if pids:
                     LOG.debug("Some processes are still running in namespace "
                               "%s on host %s. Retrying.", namespace,
-                              self.target_host)
+                              self.host)
                     time.sleep(1)
             else:
                 break
 
     def delete_remote_namespace(self, namespace):
         LOG.info("Deleting namespace %s on host %s.", namespace,
-                 self.target_host)
+                 self.host)
         try:
             if self._namespace_exists(namespace):
                 self._kill_pids_in_namespace(namespace)
                 self.host.run(self.netns_del + namespace)
         except socket.timeout:
             LOG.warn("SSH timeout exceeded. Failed to delete namespace "
-                     "%s on %s", namespace, self.target_host)
+                     "%s on %s", namespace, self.host)
 
 
 class RemoteRouterNsCleanup(RemoteNodeCleanup):
