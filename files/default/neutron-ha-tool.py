@@ -719,8 +719,7 @@ def migrate_router(qclient, router, agent, target,
         wait_router_migrated(qclient, router['id'], target['host'])
 
     if delete_namespace:
-        nscleanup = RemoteRouterNsCleanup(agent['host'])
-        nscleanup.delete_router_namespace(router['id'])
+        destroy_router_namespace(agent['host'], router['id'])
 
 
 def wait_router_migrated(qclient, router_id, target_host, maxtries=60):
@@ -1157,6 +1156,11 @@ class RemoteRouterNsCleanup(RemoteNodeCleanup):
         with self.connected_to_host():
             namespace = "qrouter-" + router_id
             self.delete_remote_namespace(namespace)
+
+
+def destroy_router_namespace(hostname, router_id):
+    ns_cleanup = RemoteRouterNsCleanup(hostname)
+    ns_cleanup.delete_router_namespace(router_id)
 
 
 class SSHHost(object):

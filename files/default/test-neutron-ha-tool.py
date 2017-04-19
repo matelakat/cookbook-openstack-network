@@ -380,8 +380,8 @@ class TestSshDeleteRouterNamespace(unittest.TestCase):
 
         mock_client.exec_command.side_effect = ssh_exec_side_effect
 
-        ns_cleanup = ha_tool.RemoteRouterNsCleanup("host1")
-        ns_cleanup.delete_router_namespace("routerid1")
+        ha_tool.destroy_router_namespace('host1', 'routerid1')
+
         expected_calls = [
             mock.call("ip netns list", get_pty=mock.ANY, timeout=mock.ANY),
             mock.call("ip netns pids qrouter-routerid1", get_pty=mock.ANY,
@@ -407,10 +407,9 @@ class TestSshDeleteRouterNamespace(unittest.TestCase):
                 mock_stdout.readlines.return_value = ["qrouter-otherid\r\n"]
             return [mock.MagicMock(), mock_stdout, mock.MagicMock()]
 
-        ns_cleanup = ha_tool.RemoteRouterNsCleanup("host1")
         mock_client.exec_command.side_effect = \
             side_effect_namespace_absent
-        ns_cleanup.delete_router_namespace("routerid1")
+        ha_tool.destroy_router_namespace('host1', 'routerid1')
         mock_client.exec_command.assert_called_once_with(
             "ip netns list", timeout=mock.ANY, get_pty=mock.ANY)
 
@@ -421,8 +420,7 @@ class TestSshDeleteRouterNamespace(unittest.TestCase):
 
         mock_client.exec_command.side_effect = \
             side_effect_ssh_connect
-        ns_cleanup = ha_tool.RemoteRouterNsCleanup("host1")
-        ns_cleanup.delete_router_namespace("routerid1")
+        ha_tool.destroy_router_namespace('host1', 'routerid1')
 
 
 class TestAgentIdBasedAgentPicker(unittest.TestCase):
