@@ -1073,42 +1073,32 @@ class HostBasedAgentPicker(object):
         )
 
 
-class RemoteNodeCleanup(object):
-    def __init__(self, host, timeout=10):
-        self.target_host = host
-        self.timeout = timeout
-        self.netns_del = "ip netns delete "
-        self.netns_pids = "ip netns pids "
-        self.netns_list = "ip netns list"
+class Namespace(object):
+    def __init__(self, host, name):
+        self.host = host
+        self.name = name
 
-    @contextlib.contextmanager
-    def connected_to_host(self):
-        with connect_to_host(self.target_host, self.timeout) as host:
-            host.run_timeout = self.timeout
-            self.host = host
-            yield host
+    def exists(self):
+        rc, out_lines = self.host.run('ip netns list')
+        return self.name in out_lines
 
-    def _namespace_exists(self, namespace):
-        rc, out_lines = self.host.run(self.netns_list)
-        return namespace in out_lines
-
-    def _get_namespace_pids(self, namespace):
-        rc, out_lines = self.host.run(self.netns_pids + namespace)
+    def get_pids(self):
+        rc, out_lines = self.host.run('ip netns pids ' + self.name)
         if rc:
             if out_lines and "No such file or directory" in out_lines[0]:
                 # Assume the namespace was delete meanwhile
                 return []
             else:
                 raise RuntimeError("Failed to get pids for namespace %s",
-                                   namespace)
+                                   self.name)
         else:
             return out_lines
 
-    def _kill_pids_in_namespace(self, namespace):
+    def kill_pids(self):
         LOG.debug("Trying to terminate all processes namespace "
-                  "%s on host %s", namespace, self.host)
+                  "%s on host %s", self.name, self.host)
         remaining = 3
-        pids = self._get_namespace_pids(namespace)
+        pids = self.get_pids()
         while pids:
             LOG.debug("Processes still running: [%s]", ", ".join(pids))
             for pid in pids:
@@ -1129,38 +1119,32 @@ class RemoteNodeCleanup(object):
 
             remaining -= 1
             if remaining:
-                pids = self._get_namespace_pids(namespace)
+                pids = self.get_pids()
                 if pids:
                     LOG.debug("Some processes are still running in namespace "
-                              "%s on host %s. Retrying.", namespace,
+                              "%s on host %s. Retrying.", self.name,
                               self.host)
                     time.sleep(1)
             else:
                 break
 
-    def delete_remote_namespace(self, namespace):
-        LOG.info("Deleting namespace %s on host %s.", namespace,
+    def destroy(self):
+        LOG.info("Destroying namespace %s on host %s.", self.name,
                  self.host)
         try:
-            if self._namespace_exists(namespace):
-                self._kill_pids_in_namespace(namespace)
-                self.host.run(self.netns_del + namespace)
+            if self.exists():
+                self.kill_pids()
+                self.host.run('ip netns delete ' + self.name)
         except socket.timeout:
             LOG.warn("SSH timeout exceeded. Failed to delete namespace "
-                     "%s on %s", namespace, self.host)
-
-
-class RemoteRouterNsCleanup(RemoteNodeCleanup):
-
-    def delete_router_namespace(self, router_id):
-        with self.connected_to_host():
-            namespace = "qrouter-" + router_id
-            self.delete_remote_namespace(namespace)
+                     "%s on %s", self.name, self.host)
 
 
 def destroy_router_namespace(hostname, router_id):
-    ns_cleanup = RemoteRouterNsCleanup(hostname)
-    ns_cleanup.delete_router_namespace(router_id)
+    namespace = "qrouter-" + router_id
+    with connect_to_host(hostname, 10) as host:
+        host.run_timeout = 10
+        Namespace(host, namespace).destroy()
 
 
 class SSHHost(object):
