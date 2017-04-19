@@ -205,7 +205,11 @@ def retry_with_backoff(fn, args):
     )(fn)
 
 
-def run(args):
+def neutron_client(insecure):
+    """Create an authenticated keystone client instance
+
+    This method is heavily relying on environment variables.
+    """
     try:
         ca = os.environ['OS_CACERT']
     except KeyError:
@@ -233,7 +237,7 @@ def run(args):
     kclient_kwargs = dict()
     kclient_kwargs['username'] = os.environ['OS_USERNAME']
     kclient_kwargs['password'] = os_password
-    kclient_kwargs['insecure'] = args.insecure
+    kclient_kwargs['insecure'] = insecure
     kclient_kwargs['ca_cert'] = ca
     kclient_kwargs['auth_url'] = os.environ['OS_AUTH_URL']
     kclient_kwargs['region_name'] = os.environ['OS_REGION_NAME']
@@ -262,6 +266,11 @@ def run(args):
 
     # set json return type
     qclient.format = 'json'
+    return qclient
+
+
+def run(args):
+    qclient = neutron_client(args.insecure)
 
     if args.agent_selection_mode == 'random':
         agent_picker = RandomAgentPicker()
