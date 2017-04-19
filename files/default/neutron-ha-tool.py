@@ -361,6 +361,17 @@ class Agent(object):
     def add_router(self, router):
         self.routers.append(router)
 
+    @property
+    def id(self):
+        return self.agent_dict['id']
+
+    @property
+    def availability_zone(self):
+        return self.agent_dict.get('description')
+
+    def __str__(self):
+        return self.id
+
 
 def live_agent_list(qclient):
     """Create an AgentList populated with the live agents of the system

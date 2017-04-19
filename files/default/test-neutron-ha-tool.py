@@ -17,9 +17,19 @@ class FakeNeutron(object):
         self.routers = {}
         self.agents = {}
         self.routers_by_agent = collections.defaultdict(set)
+        self.ports = {}
+
+    def add_port(self, port_id, **attrs):
+        self.ports[port_id] = attrs
 
     def add_agent(self, agent_id, props):
         self.agents[agent_id] = dict(props, id=agent_id)
+
+    def add_live_l3_agent(self, agent_id, **props):
+        self.add_agent(
+            agent_id,
+            dict(props, agent_type='L3 agent', alive=True, admin_state_up=True)
+        )
 
     def add_router(self, agent_id, router_id, props):
         self.routers[router_id] = dict(props, id=router_id)
@@ -37,9 +47,19 @@ class FakeNeutronClient(object):
     def __init__(self, fake_neutron):
         self.fake_neutron = fake_neutron
 
-    def list_agents(self):
+    def list_agents(self, agent_type=None):
+        def agent_filter(agent):
+            if agent_type is not None:
+                return agent.get('agent_type') == agent_type
+            return True
+
         return {
-            'agents': self.fake_neutron.agents.values()
+            'agents': filter(agent_filter, self.fake_neutron.agents.values())
+        }
+
+    def list_routers(self):
+        return {
+            'routers': self.fake_neutron.routers.values()
         }
 
     def list_routers_on_l3_agent(self, agent_id):
@@ -57,17 +77,11 @@ class FakeNeutronClient(object):
         self.fake_neutron.routers_by_agent[agent_id].add(
             router_body['router_id'])
 
-    def list_ports(self, device_id, fields):
+    def list_ports(self, fields=None, **filters):
         return {
-            'ports': [
-                {
-                    'id': 'someid',
-                    'binding:host_id':
-                        self.fake_neutron.agent_by_router(device_id)['host'],
-                    'binding:vif_type': 'non distributed',
-                    'status': 'ACTIVE'
-                }
-            ]
+            'ports': filter(
+                make_filter(filters), self.fake_neutron.ports.values()
+            )
         }
 
     def list_floatingips(self, router_id):
@@ -79,6 +93,19 @@ class FakeNeutronClient(object):
                 }
             ]
         }
+
+
+def make_filter(args):
+
+    def filter_fun(record):
+        for key, value in args.items():
+            if value is None:
+                continue
+            if record[key] != value:
+                return False
+        return True
+
+    return filter_fun
 
 
 def setup_fake_neutron(live_agents=0, dead_agents=0):
@@ -518,7 +545,7 @@ class TestArgumentParsing(unittest.TestCase):
         self.assertEqual('host', params.target_host)
 
 
-def signal_tester(queue):
+def signal_harness(queue):
     import importlib
     import time
     import sys
@@ -545,7 +572,7 @@ class TestSignalHandling(unittest.TestCase):
     def test_term_signal_handling_functionality(self):
         queue = multiprocessing.Queue()
 
-        proc = multiprocessing.Process(target=signal_tester, args=(queue,))
+        proc = multiprocessing.Process(target=signal_harness, args=(queue,))
         proc.start()
         self.assertEquals('started critical block', queue.get())
         proc.terminate()
@@ -669,6 +696,13 @@ class TestAgentRebalancing(unittest.TestCase):
         self.assertEqual(
             [5], get_router_distribution(neutron_client)
         )
+
+
+class TestAgent(unittest.TestCase):
+    def test_str(self):
+        agent = ha_tool.Agent({'id': 'some-agent'}, [])
+
+        self.assertEqual('some-agent', str(agent))
 
 
 if __name__ == "__main__":
