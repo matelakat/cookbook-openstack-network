@@ -690,6 +690,16 @@ class TestAgentRebalancing(unittest.TestCase):
         )
 
 
+def mock_exec_command_call(ssh_client, lines=None, return_code=0):
+    lines = lines or []
+    stdout = mock.Mock()
+    stdout.readlines.return_value = lines
+    stdout.channel.recv_exit_status.return_value = return_code
+    ssh_client.exec_command.return_value = (
+        mock.Mock(), stdout, mock.Mock()
+    )
+
+
 class TestSSHHost(unittest.TestCase):
     @mocked_ssh_client
     def test_str_prints_hostname(self, ssh_client):
@@ -705,12 +715,7 @@ class TestSSHHost(unittest.TestCase):
 
     @mocked_ssh_client
     def test_setting_run_timeout_on_host(self, ssh_client):
-        stdout = mock.Mock()
-        stdout.readlines.return_value = []
-        stdout.channel.recv_exit_status.return_value = 0
-        ssh_client.exec_command.return_value = (
-            mock.Mock(), stdout, mock.Mock()
-        )
+        mock_exec_command_call(ssh_client)
 
         with ha_tool.connect_to_host('somehost', 10) as host:
             host.run_timeout = 30
@@ -721,11 +726,10 @@ class TestSSHHost(unittest.TestCase):
 
     @mocked_ssh_client
     def test_run_return_values(self, ssh_client):
-        stdout = mock.Mock()
-        stdout.readlines.return_value = ['  line 1  \r\n', '  line2  \r\n']
-        stdout.channel.recv_exit_status.return_value = 4
-        ssh_client.exec_command.return_value = (
-            mock.Mock(), stdout, mock.Mock()
+        mock_exec_command_call(
+            ssh_client,
+            lines=['  line 1  \r\n', '  line2  \r\n'],
+            return_code=4
         )
 
         with ha_tool.connect_to_host('somehost', 10) as host:
