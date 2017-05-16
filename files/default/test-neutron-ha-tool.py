@@ -39,6 +39,10 @@ class FakeNeutronClient(object):
     def __init__(self, fake_neutron):
         self.fake_neutron = fake_neutron
         self.list_agent_calls = 0
+        self._router_removal_failures_to_emulate = 0
+
+    def mock_make_router_removal_fail_once(self):
+        self._router_removal_failures_to_emulate = 1
 
     def list_agents(self):
         self.list_agent_calls += 1
@@ -55,7 +59,10 @@ class FakeNeutronClient(object):
         }
 
     def remove_router_from_l3_agent(self, agent_id, router_id):
-        self.fake_neutron.routers_by_agent[agent_id].remove(router_id)
+        if self._router_removal_failures_to_emulate:
+            self._router_removal_failures_to_emulate -= 1
+        else:
+            self.fake_neutron.routers_by_agent[agent_id].remove(router_id)
 
     def add_router_to_l3_agent(self, agent_id, router_body):
         self.fake_neutron.routers_by_agent[agent_id].add(
@@ -110,6 +117,25 @@ def setup_fake_neutron(live_agents=0, dead_agents=0):
             }
         )
     return fake_neutron
+
+
+class TestMigrateRouter(unittest.TestCase):
+    def test_migration_fails_on_a_non_distributed_router(self):
+        fake_neutron = setup_fake_neutron(live_agents=1, dead_agents=1)
+        neutron_client = FakeNeutronClient(fake_neutron)
+        neutron_client.mock_make_router_removal_fail_once()
+        fake_neutron.add_router(
+            'dead-agent-0', 'router-1', {'distributed': False}
+        )
+
+        with self.assertRaises(RuntimeError):
+            ha_tool.migrate_router(
+                neutron_client,
+                {'id': 'router-1', 'distributed': False},
+                {'id': 'dead-agent-0'},
+                {'id': 'live-agent-0'},
+                wait_for_router=False
+            )
 
 
 class TestL3AgentMigrate(unittest.TestCase):
