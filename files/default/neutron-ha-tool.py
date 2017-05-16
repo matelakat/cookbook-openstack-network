@@ -709,7 +709,10 @@ def migrate_router(qclient, router, agent, target,
             LOG.debug("The router was not correctly deleted from agent=%s, "
                       "retrying." % agent['id'])
 
-        if router_is_on_agent(qclient, router, agent):
+            if router_is_on_agent(qclient, router, agent):
+                raise RuntimeError("Failed to remove router_id=%s from agent_id="
+                                   "%s" % (router['id'], agent['id']))
+        else:
             raise RuntimeError("Failed to remove router_id=%s from agent_id="
                                "%s" % (router['id'], agent['id']))
 
