@@ -699,22 +699,24 @@ def migrate_router(qclient, router, agent, target,
     qclient.remove_router_from_l3_agent(agent['id'], router['id'])
     LOG.debug("Removed router from agent=%s" % agent['id'])
 
-    # ensure it is removed
-    if router_is_on_agent(qclient, router, agent):
-        if router['distributed']:
-            # Because of bsc#1016943, the router is not completely removed
-            # from the agent. As a workaround, issuing a second remove
-            # seems to bring the router/agent intro correct state
-            qclient.remove_router_from_l3_agent(agent['id'], router['id'])
-            LOG.debug("The router was not correctly deleted from agent=%s, "
-                      "retrying." % agent['id'])
+    router_still_on_source_agent = router_is_on_agent(qclient, router, agent)
 
-            if router_is_on_agent(qclient, router, agent):
-                raise RuntimeError("Failed to remove router_id=%s from agent_id="
-                                   "%s" % (router['id'], agent['id']))
-        else:
-            raise RuntimeError("Failed to remove router_id=%s from agent_id="
-                               "%s" % (router['id'], agent['id']))
+    # ensure it is removed
+    if router_still_on_source_agent and router['distributed']:
+        # Because of bsc#1016943, the router is not completely removed
+        # from the agent. As a workaround, issuing a second remove
+        # seems to bring the router/agent intro correct state
+        qclient.remove_router_from_l3_agent(agent['id'], router['id'])
+        LOG.debug("The router was not correctly deleted from agent=%s, "
+                  "retrying." % agent['id'])
+
+        router_still_on_source_agent = router_is_on_agent(
+            qclient, router, agent
+        )
+
+    if router_still_on_source_agent:
+        raise RuntimeError("Failed to remove router_id=%s from agent_id="
+                           "%s" % (router['id'], agent['id']))
 
     # add the router id to a live agent
     router_body = {'router_id': router['id']}
